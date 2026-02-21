@@ -1,0 +1,57 @@
+extends CharacterBody3D
+
+@onready var anim_player = $liliye_walking/AnimationPlayer
+@onready var spring_arm = $SpringArm3D 
+
+# 1. We 'Preload' the file you successfully extracted!
+var walk_resource = preload("res://walk.res")
+
+const SPEED = 5.0
+const MOUSE_SENSITIVITY = 0.003
+const RESPAWN_HEIGHT = -20.0 
+
+var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
+var spawn_position = Vector3.ZERO 
+
+func _ready():
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	spawn_position = global_position 
+	
+	# 2. This is the 'Golden Key': We manually add the animation to the player
+	# We name it "walk" so we never have to type the long Mixamo name again!
+	var lib = anim_player.get_animation_library("") # Get the default library
+	if lib:
+		lib.add_animation("walk", walk_resource)
+
+func _unhandled_input(event):
+	if event is InputEventMouseMotion:
+		rotate_y(-event.relative.x * MOUSE_SENSITIVITY) 
+		spring_arm.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
+		spring_arm.rotation.x = clamp(spring_arm.rotation.x, -PI/4, PI/4)
+
+func _physics_process(delta):
+	# Gravity & Respawn
+	if not is_on_floor():
+		velocity.y -= gravity * delta
+	
+	if global_position.y < RESPAWN_HEIGHT:
+		global_position = spawn_position
+		velocity = Vector3.ZERO
+
+	# Movement logic
+	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var direction = (transform.basis * Vector3(-input_dir.x, 0, -input_dir.y)).normalized()
+	
+	if direction:
+		velocity.x = direction.x * SPEED
+		velocity.z = direction.z * SPEED
+		
+		# Now we just call it "walk"!
+		if anim_player.current_animation != "walk":
+			anim_player.play("walk")
+	else:
+		velocity.x = move_toward(velocity.x, 0, SPEED)
+		velocity.z = move_toward(velocity.z, 0, SPEED)
+		anim_player.stop()
+
+	move_and_slide()
